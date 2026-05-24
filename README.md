@@ -1,16 +1,16 @@
 # peel
 
-peel is an agentic AI financial copilot designed for Tangerine. It mvoes beyond passive dashboards to proactive, user-in-the-loop financial management. By peeling back financial complexity, peel reveals clarity, automates decision-making, and helps young Canadians take control of their financial future.
+peel is an agentic AI financial copilot designed for Tangerine. It moves beyond passive dashboards to proactive, user-in-the-loop financial management. By peeling back financial complexity, peel reveals clarity, automates decision-making, and helps young Canadians take control of their financial future.
 
 ## The Vision
 
-Most personal finance tools are reactive, they show you what you did yesterday. peel is proactive. It acts as a friend who is great with money, accesible right through a chat interface.
+Most personal finance tools are reactive; they show you what you did yesterday. peel is proactive. It acts as a friend who is great with money, accessible right through a chat interface.
 
 ## Why peel?
 
-For the user it solves the "tools gap" left by Mint's departure. It handles receipt scanning, classifies needs vs. wants, provides real-time purchase advice, and identifies "found money" (unused subscriptions, tax efficiencies)
+For the user, it solves the "tools gap" left by Mint's departure. It handles receipt scanning, classifies needs vs. wants, provides real-time purchase advice, and identifies "found money" (unused subscriptions, tax efficiencies)
 
-For Tangerine is leverages Tangerine's structural advantages (full banking license, Scotiabank infrastructure) to create the "intelligence" necessary to win against fintech companies like Wealthsimple.
+For Tangerine, it leverages Tangerine's structural advantages (full banking license, Scotiabank infrastructure) to create the "intelligence" necessary to win against fintech companies like Wealthsimple.
 
 ## How It Works
 
@@ -36,6 +36,6 @@ Acts with permission. Executes one-tap actions like cancelling subscriptions or 
 
 3. Pre-Purchase Advisor: Text "Can I afford these $180 sneakers?" and get an honest answer based on your actual budget and progress toward your goals.
 
-4. Savings Goals: Track life goals (e.g., Trips, Emergency Fund) with visual progress bars woven directly into the conservation.
+4. Savings Goals: Track life goals (e.g., Trips, Emergency Fund) with visual progress bars woven directly into the conversation.
 
 5. One-Tap Execution: Identify wasted subscriptions or missed tax opportunities and "Fix All" with one tap.
