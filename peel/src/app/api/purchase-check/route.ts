@@ -22,7 +22,7 @@ TONE RULES:
 - If they ask about their spending: reference actual numbers from their data
 - If the message doesn't relate to money at all: still be friendly, but gently steer back to finances
 
-Return ONLY JSON:
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
 {"messages":[{"text": string}]}
 Return 1-3 messages. Each should be 1-3 sentences.`;
 
