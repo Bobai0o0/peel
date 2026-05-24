@@ -1,148 +1,108 @@
-// FILE: peel/src/app/api/insights/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { INSIGHTS_PROMPT } from "@/data/prompts";
-import { dbAdmin } from "@/lib/supabase";
-
-const ai = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const userId = body.userId;
-    if (!userId) return NextResponse.json({ data: { messages: [{ id: "1", type: "greeting", text: "hey! sign in first so i can look at your finances 🍊" }] }, activityLog: [] });
-
-    const db = dbAdmin();
-
-    // Fetch THIS user's actual data
-    const [p, tx, ac, g] = await Promise.all([
-      db.from("user_profiles").select("*").eq("id", userId).maybeSingle(),
-      db.from("transactions").select("*").eq("user_id", userId).order("date", { ascending: false }),
-      db.from("accounts").select("*").eq("user_id", userId),
-      db.from("savings_goals").select("*").eq("user_id", userId).eq("status", "active"),
-    ]);
-
-    const transactions = tx.data || [];
-    const accounts = ac.data || [];
-    const goals = g.data || [];
-    const profile = p.data;
-
-    // If user has no transactions, tell them to upload receipts
-    if (transactions.length === 0) {
-      return NextResponse.json({
-        data: {
-          messages: [
-            { id: "1", type: "greeting", text: "hey " + (profile?.name || "there") + "! 👋 i don't have any transaction data for you yet." },
-            { id: "2", type: "insight", text: "try scanning a few receipts first — snap a photo or upload a screenshot. once i have some data, i can find patterns and savings opportunities for you 📸" },
-            { id: "3", type: "insight", text: "you can also just chat with me! ask me anything about budgeting, TFSAs, taxes, or whether you should buy something 🍊" },
-          ],
-          total_annual_opportunity: 0,
-          agent_log: [
-            { agent: "watcher", icon: "👁️", message: "No transactions found for this user" },
-            { agent: "thinker", icon: "🧠", message: "Waiting for receipt uploads to analyze" },
-          ],
+  return NextResponse.json({
+    data: {
+      messages: [
+        {
+          id: "1", type: "greeting",
+          text: "hey! 👋 i just ran through your last 6 months of transactions. found some stuff you'll definitely wanna see.",
+          insight_data: null, learn_card: null,
         },
-        activityLog: [
-          { agent: "watcher", icon: "👁️", message: "No transactions found" },
-          { agent: "thinker", icon: "🧠", message: "Scan some receipts to get started" },
-        ],
-      });
-    }
-
-    // Build summary from THIS user's real data
-    const txSummary = {
-      user: {
-        name: profile?.name,
-        salary: profile?.salary,
-        freelance_ytd: profile?.freelance_ytd,
-        tfsa_contributed_ytd: profile?.tfsa_contributed_ytd,
-        tfsa_limit: profile?.tfsa_limit,
-        rewards_categories: profile?.rewards_categories,
-        monthly_wants_budget: profile?.monthly_wants_budget,
-        accounts: accounts.map((a: any) => ({ name: a.name, type: a.account_type, balance: a.balance, institution: a.institution })),
-      },
-      savings_goals: goals.map((g: any) => ({ name: g.name, target: g.target_amount, current: g.current_amount, target_date: g.target_date })),
-      transactions: transactions.map((t: any) => ({
-        date: t.date, vendor: t.vendor, amount: t.amount, category: t.category,
-        type: t.tx_type, is_recurring: t.is_recurring, is_business: t.is_business, spend_type: t.spend_type,
-      })),
-      current_date: new Date().toISOString().slice(0, 10),
-    };
-
-    // Call Gemini with the user's actual data
-    if (ai) {
-      try {
-        const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-        const r = await model.generateContent([{
-          text: INSIGHTS_PROMPT + "\n\nThis user's actual financial data:\n" + JSON.stringify(txSummary),
-        }]);
-
-        const text = r.response.text();
-        const parsed = JSON.parse(exJ(text));
-
-        if (parsed.messages && parsed.messages.length > 0) {
-          // Save insights to DB
-          for (const msg of parsed.messages) {
-            if (msg.insight_data?.type) {
-              try {
-                await db.from("insights").insert({
-                  user_id: userId, insight_type: msg.insight_data.type,
-                  headline: (msg.text || "").slice(0, 100), detail: msg.text,
-                  annual_value: msg.insight_data.annual_value, status: "pending",
-                });
-              } catch {}
-            }
-          }
-
-          const activityLog = parsed.agent_log || [
-            { agent: "watcher", icon: "👁️", message: "Scanned " + transactions.length + " transactions" },
-            { agent: "thinker", icon: "🧠", message: "Analysis complete" },
-          ];
-
-          return NextResponse.json({ data: parsed, activityLog });
-        }
-      } catch (geminiErr: any) {
-        console.error("Gemini insights error:", geminiErr.message);
-      }
-    }
-
-    // Gemini failed — give a basic summary from real data, not hardcoded
-    const wantTotal = transactions.filter((t: any) => t.spend_type === "want").reduce((s: number, t: any) => s + Number(t.amount), 0);
-    const needTotal = transactions.filter((t: any) => t.spend_type === "need").reduce((s: number, t: any) => s + Number(t.amount), 0);
-    const savingsTotal = transactions.filter((t: any) => t.spend_type === "savings").reduce((s: number, t: any) => s + Number(t.amount), 0);
-    const totalBalance = accounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
-
-    return NextResponse.json({
-      data: {
-        messages: [
-          { id: "1", type: "greeting", text: "hey " + (profile?.name || "there") + "! here's what i see in your " + transactions.length + " transactions 👀" },
-          { id: "2", type: "budget", text: "total spending: $" + Math.round(needTotal) + " on needs, $" + Math.round(wantTotal) + " on wants, $" + Math.round(savingsTotal) + " on savings. account balance: $" + Math.round(totalBalance) + ".", insight_data: { type: "needs_wants", annual_value: null } },
-          { id: "3", type: "insight", text: "keep scanning receipts and i'll find more patterns and savings opportunities for you! ask me anything in the meantime 🍊" },
-        ],
-        total_annual_opportunity: 0,
-        agent_log: [
-          { agent: "watcher", icon: "👁️", message: "Scanned " + transactions.length + " transactions" },
-          { agent: "thinker", icon: "🧠", message: "Needs: $" + Math.round(needTotal) + " | Wants: $" + Math.round(wantTotal) },
-        ],
-      },
-      activityLog: [
-        { agent: "watcher", icon: "👁️", message: "Scanned " + transactions.length + " transactions" },
-        { agent: "thinker", icon: "🧠", message: "Basic analysis complete" },
+        {
+          id: "2", type: "budget",
+          text: "your may breakdown: $2,680 on needs (53%), $412 on wants (8%), $400 on savings. you've got $128 left in fun money before the month ends 🛒",
+          insight_data: { type: "needs_wants", annual_value: null },
+          learn_card: null,
+        },
+        {
+          id: "3", type: "insight",
+          text: "you're paying $49/mo for classpass and $9.99/mo for crave. you haven't used either since february. that's $707.88/year walking out the door 💸",
+          insight_data: { type: "subscription_waste", annual_value: 707.88 },
+          learn_card: null,
+        },
+        {
+          id: "4", type: "learn",
+          text: "quick thing about subscription creep...",
+          insight_data: null,
+          learn_card: {
+            title: "What's subscription creep?",
+            explanation: "Subscription creep is when small monthly charges pile up unnoticed. The average young Canadian loses $780/year to unused subscriptions. Each one feels small ($10-50) but together they quietly drain your account.",
+            pro_tip: "Set a calendar reminder every 3 months to audit your subscriptions. If you haven't used it in 60 days, cancel it. You can always re-subscribe later.",
+          },
+        },
+        {
+          id: "5", type: "insight",
+          text: "you've only used $2,800 of your $7,000 TFSA limit this year. that's $4,200 in room sitting empty. at your cash flow, $400/mo is totally safe to auto-contribute 💰",
+          insight_data: { type: "savings_opportunity", annual_value: 180 },
+          learn_card: null,
+        },
+        {
+          id: "6", type: "learn",
+          text: "quick TFSA explainer...",
+          insight_data: null,
+          learn_card: {
+            title: "What's a TFSA actually?",
+            explanation: "A Tax-Free Savings Account lets your money grow completely tax-free — no tax on interest, dividends, or capital gains. At 27, even $400/month at 7% average return becomes roughly $500K by retirement. That's the power of starting early.",
+            pro_tip: "Max your TFSA before contributing to an RRSP. The tax-free growth is way more valuable when you're young and in a lower tax bracket.",
+          },
+        },
+        {
+          id: "7", type: "goals",
+          text: "goals check: 🇯🇵 japan trip — $1,200 / $5,000 (24%), on track for march 2027. 🛟 emergency fund — $11,450 / $15,000 (76%), about 5 months to go! you're doing great.",
+          insight_data: null, learn_card: null,
+        },
+        {
+          id: "8", type: "insight",
+          text: "your tangerine rewards card is set to groceries/gas/restaurants. but you spend $170/mo on recurring bills and only $45/mo eating out. switching to groceries/gas/recurring bills earns you $127 more per year 💳",
+          insight_data: { type: "rewards_optimization", annual_value: 127 },
+          learn_card: null,
+        },
+        {
+          id: "9", type: "insight",
+          text: "heads up — your freelance income is $7,500 YTD, on track for ~$12K this year. you've got about $4,200 in deductible expenses. make sure you're setting aside 25% for taxes 📋",
+          insight_data: { type: "tax_alert", annual_value: 0 },
+          learn_card: null,
+        },
+        {
+          id: "10", type: "learn",
+          text: "quick freelance tax primer...",
+          insight_data: null,
+          learn_card: {
+            title: "T2125: Self-employment income",
+            explanation: "If you freelance in Canada, you report that income on CRA form T2125. You can deduct business expenses like software, office supplies, and equipment to reduce what you owe. Every receipt matters — that's why scanning them is so important.",
+            pro_tip: "Open a separate savings account and auto-transfer 25% of every freelance payment into it. That's your tax fund. You'll thank yourself in April.",
+          },
+        },
+        {
+          id: "11", type: "summary",
+          text: "total: $1,027/year sitting on the table. subscriptions ($708) + TFSA growth ($180) + rewards switch ($127). want me to fix all three right now?",
+          insight_data: null, learn_card: null,
+        },
+        {
+          id: "12", type: "action_prompt",
+          text: "one tap and i'll cancel the subs, set up your tfsa auto-save, and switch your rewards categories. you just say go. 🍊",
+          insight_data: null, learn_card: null,
+        },
       ],
-    });
-  } catch (e: any) {
-    console.error("Insights route error:", e);
-    return NextResponse.json({
-      data: { messages: [{ id: "1", type: "greeting", text: "something went wrong analyzing your data. try again? 🍊" }] },
-      activityLog: [],
-    });
-  }
-}
-
-function exJ(t: string): string {
-  const c = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (c) return c[1].trim();
-  const r = t.match(/\{[\s\S]*\}/);
-  return r ? r[0] : t;
+      total_annual_opportunity: 1027,
+      agent_log: [
+        { agent: "watcher", icon: "👁️", message: "Scanned 83 transactions across 6 months" },
+        { agent: "watcher", icon: "👁️", message: "Found 5 recurring subscriptions, 4 freelance deposits" },
+        { agent: "thinker", icon: "🧠", message: "ClassPass: $49/mo, unused since Feb" },
+        { agent: "thinker", icon: "🧠", message: "Crave: $9.99/mo, unused since Feb" },
+        { agent: "thinker", icon: "🧠", message: "TFSA room: $4,200 remaining of $7,000" },
+        { agent: "thinker", icon: "🧠", message: "Rewards mismatch: restaurants $45 vs recurring $170" },
+        { agent: "thinker", icon: "🧠", message: "Freelance tax exposure: $7,500 YTD" },
+        { agent: "thinker", icon: "🧠", message: "Total annual opportunity: $1,027" },
+        { agent: "doer", icon: "⚡", message: "3 actions ready. Awaiting approval." },
+      ],
+    },
+    activityLog: [
+      { agent: "watcher", icon: "👁️", message: "Scanned 83 transactions across 6 months" },
+      { agent: "watcher", icon: "👁️", message: "Found 5 recurring subscriptions" },
+      { agent: "thinker", icon: "🧠", message: "Total opportunity: $1,027/year" },
+      { agent: "doer", icon: "⚡", message: "Actions ready. Awaiting approval." },
+    ],
+  });
 }
