@@ -18,15 +18,15 @@ peel uses a specialized orchestration of agents to handle the complexity of your
 
 ### The Watcher
 
--Sees everything. Parses receipts, categorizes transactions, and monitors for anomalies.
+Sees everything. Parses receipts, categorizes transactions, and monitors for anomalies.
 
 ### The Thinker
 
--Analyzes patterns. Runs the 50/30/20 framework, calculates savings progress, and powers the pre-purchase advisor.
+Analyzes patterns. Runs the 50/30/20 framework, calculates savings progress, and powers the pre-purchase advisor.
 
 ### The Doer
 
--Acts with permission. Executes one-tap actions like cancelling subscriptions or shifting rewards categories.
+Acts with permission. Executes one-tap actions like cancelling subscriptions or shifting rewards categories.
 
 ## Core Features
 
