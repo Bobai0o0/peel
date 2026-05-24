@@ -1,68 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { WATCHER_RECEIPT_PROMPT, THINKER_EXPENSE_PROMPT } from "@/data/prompts";
-import { getServiceSupabase } from "@/lib/supabase";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const PRIYA_ID = "00000000-0000-0000-0000-000000000001";
+import { RECEIPT_PROMPT, EXPENSE_PROMPT } from "@/data/prompts";
+import { dbAdmin } from "@/lib/supabase";
+const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
-  const db = getServiceSupabase();
-  const sessionId = crypto.randomUUID();
-  try {
-    const { image } = await req.json();
-    const matches = image.match(/^data:(.+);base64,(.+)$/);
-    if (!matches) return NextResponse.json({ error: "Invalid image" }, { status: 400 });
+  const db = dbAdmin();
+  const { image, userId } = await req.json();
+  if (!userId) return NextResponse.json({ error: "No user" }, { status: 400 });
+  const m = image.match(/^data:(.+);base64,(.+)$/);
+  if (!m) return NextResponse.json({ error: "Bad image" }, { status: 400 });
 
-    await db.from("agent_activity").insert({ user_id: PRIYA_ID, agent: "watcher", icon: "👁️", message: "Scanning receipt...", session_id: sessionId });
+  const sid = crypto.randomUUID();
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const watcherResult = await model.generateContent([
-      { text: WATCHER_RECEIPT_PROMPT + "\n\nParse this receipt:" },
-      { inlineData: { mimeType: matches[1], data: matches[2] } },
-    ]);
-    const receipt = JSON.parse(extractJSON(watcherResult.response.text()));
+  const r1 = await model.generateContent([{ text: RECEIPT_PROMPT + "\nParse:" }, { inlineData: { mimeType: m[1], data: m[2] } }]);
+  const receipt = JSON.parse(exJ(r1.response.text()));
 
-    await db.from("scanned_receipts").insert({
-      user_id: PRIYA_ID, vendor_name: receipt.vendor_name, receipt_date: receipt.date,
-      total_amount: receipt.total_amount, subtotal: receipt.subtotal,
-      gst_hst_amount: receipt.gst_hst_amount, gst_hst_rate: receipt.gst_hst_rate,
-      items: receipt.items, category: receipt.category,
-      is_business_expense: receipt.is_business_expense, cra_form: receipt.cra_form,
-      cra_line_item: receipt.cra_line_item, confidence: receipt.confidence, source: "upload",
-    });
+  await db.from("scanned_receipts").insert({ user_id:userId, vendor_name:receipt.vendor_name, total_amount:receipt.total_amount, category:receipt.category, is_business_expense:receipt.is_business_expense, cra_form:receipt.cra_form, items:receipt.items, gst_hst_amount:receipt.gst_hst_amount, spend_type:receipt.spend_type });
+  await db.from("transactions").insert({ user_id:userId, date:receipt.date||new Date().toISOString().slice(0,10), vendor:receipt.vendor_name, amount:receipt.total_amount, category:receipt.category, tx_type:"debit", account_name:"Visa", is_business:receipt.is_business_expense, spend_type:receipt.spend_type||"want" });
 
-    await db.from("transactions").insert({
-      user_id: PRIYA_ID, date: receipt.date || new Date().toISOString().split("T")[0],
-      vendor: receipt.vendor_name, amount: receipt.total_amount, category: receipt.category,
-      tx_type: "debit", account_name: "Visa", is_recurring: false,
-      is_business: receipt.is_business_expense, spend_type: receipt.spend_type || "want",
-    });
+  const log = [
+    { agent:"watcher", icon:"👁️", message:`${receipt.vendor_name}, $${receipt.total_amount} — ${receipt.category}` },
+    { agent:"watcher", icon:"👁️", message: receipt.is_business_expense ? `Business expense. ${receipt.cra_form}` : `${receipt.spend_type} expense` },
+  ];
 
-    await db.from("agent_activity").insert({ user_id: PRIYA_ID, agent: "watcher", icon: "👁️", message: `${receipt.vendor_name}, $${receipt.total_amount} — ${receipt.category}`, session_id: sessionId });
+  const r2 = await model.generateContent([{ text: EXPENSE_PROMPT + "\n" + JSON.stringify({ expense:receipt, ytd_deductions:4200 }) }]);
+  const analysis = JSON.parse(exJ(r2.response.text()));
+  for (const s of analysis.reasoning_steps||[]) log.push({ agent:"thinker", icon:"🧠", message:s });
+  log.push({ agent:"doer", icon:"⚡", message:"Added to expense report." });
 
-    const thinkerResult = await model.generateContent([{
-      text: THINKER_EXPENSE_PROMPT + "\n\nNew expense:\n" + JSON.stringify({ new_expense: receipt, ytd_business_deductions: 4200, ytd_freelance_revenue: 7500 }),
-    }]);
-    const analysis = JSON.parse(extractJSON(thinkerResult.response.text()));
-
-    for (const step of analysis.reasoning_steps || []) {
-      await db.from("agent_activity").insert({ user_id: PRIYA_ID, agent: "thinker", icon: "🧠", message: step, session_id: sessionId });
-    }
-    await db.from("agent_activity").insert({ user_id: PRIYA_ID, agent: "doer", icon: "⚡", message: "Added to expense report.", session_id: sessionId });
-
-    const { data: activityLog } = await db.from("agent_activity").select("agent, icon, message").eq("session_id", sessionId).order("created_at");
-    return NextResponse.json({ receipt, analysis, activityLog, sessionId });
-  } catch (error: any) {
-    console.error("Receipt error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  for (const l of log) await db.from("agent_activity").insert({ ...l, user_id:userId, session_id:sid });
+  return NextResponse.json({ receipt, analysis, activityLog:log });
 }
-
-function extractJSON(text: string): string {
-  const cb = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (cb) return cb[1].trim();
-  const raw = text.match(/\{[\s\S]*\}/);
-  if (raw) return raw[0];
-  return text;
-}
+function exJ(t){const c=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(c)return c[1].trim();const r=t.match(/\{[\s\S]*\}/);return r?r[0]:t}
