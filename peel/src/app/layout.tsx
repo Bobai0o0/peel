@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-export const metadata: Metadata = { title: "Peel" };
+import "./globals.css";
+export const metadata: Metadata = { title: "Peel — AI Financial Copilot" };
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" /></head><body style={{background:"#0a0a0f",color:"#fff",fontFamily:"-apple-system,sans-serif",margin:0}}>{children}</body></html>;
+  return <html lang="en"><body className="bg-white-smoke-1 text-dim-gray-400 font-sans antialiased">{children}</body></html>;
 }

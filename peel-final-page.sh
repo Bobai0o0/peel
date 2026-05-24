@@ -1,3 +1,24 @@
+#!/bin/bash
+# PEEL FINAL PAGE — Homepage + working chat app
+# Run AFTER: bash peel-final.sh
+
+cat > peel/src/app/globals.css << 'EOF'
+@tailwind base; @tailwind components; @tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+@keyframes mini-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.dot{animation:mini-bounce .8s infinite ease-in-out} .dot:nth-child(2){animation-delay:.15s} .dot:nth-child(3){animation-delay:.3s}
+EOF
+
+cat > peel/src/app/layout.tsx << 'EOF'
+import type { Metadata } from "next";
+import "./globals.css";
+export const metadata: Metadata = { title: "Peel — AI Financial Copilot" };
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <html lang="en"><body className="bg-white-smoke-1 text-dim-gray-400 font-sans antialiased">{children}</body></html>;
+}
+EOF
+
+cat > peel/src/app/page.tsx << 'ENDPAGE'
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -393,3 +414,17 @@ export default function Home() {
     </div>
   );
 }
+ENDPAGE
+
+echo ""
+echo "✅ All done!"
+echo ""
+echo "  cd peel"
+echo "  cp .env.local.example .env.local   # add your 4 keys"
+echo "  # paste supabase/schema.sql into Supabase SQL Editor → Run"
+echo "  npm install"
+echo "  npm run dev"
+echo ""
+echo "  Landing page → Sign up → Load demo → Chat with Peel"
+echo ""
+echo "🍊 Go win this!"
