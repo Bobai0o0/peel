@@ -1,34 +1,34 @@
-#peel
+# peel
 
 peel is an agentic AI financial copilot designed for Tangerine. It mvoes beyond passive dashboards to proactive, user-in-the-loop financial management. By peeling back financial complexity, peel reveals clarity, automates decision-making, and helps young Canadians take control of their financial future.
 
-##The Vision
+## The Vision
 
 Most personal finance tools are reactive, they show you what you did yesterday. peel is proactive. It acts as a friend who is great with money, accesible right through a chat interface.
 
-##Why peel?
+## Why peel?
 
 For the user it solves the "tools gap" left by Mint's departure. It handles receipt scanning, classifies needs vs. wants, provides real-time purchase advice, and identifies "found money" (unused subscriptions, tax efficiencies)
 
 For Tangerine is leverages Tangerine's structural advantages (full banking license, Scotiabank infrastructure) to create the "intelligence" necessary to win against fintech companies like Wealthsimple.
 
-##How It Works
+## How It Works
 
 peel uses a specialized orchestration of agents to handle the complexity of your financial life:
 
-###The Watcher
+### The Watcher
 
 -Sees everything. Parses receipts, categorizes transactions, and monitors for anomalies.
 
-###The Thinker
+### The Thinker
 
 -Analyzes patterns. Runs the 50/30/20 framework, calculates savings progress, and powers the pre-purchase advisor.
 
-###The Doer
+### The Doer
 
 -Acts with permission. Executes one-tap actions like cancelling subscriptions or shifting rewards categories.
 
-##Core Features
+## Core Features
 
 1. Receipt Scanning: Snap a photo of a physical receipt or forward a digital one. The Watcher instantly parses vendor, tax, and category data.
 
