@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
       const result = await model.generateContent([{
         text: CHAT_PROMPT + "\n\nUser's financial context:\n" + context + "\n\nUser says: " + (message || "hello"),
       }]);

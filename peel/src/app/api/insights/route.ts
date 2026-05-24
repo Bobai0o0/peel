@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     // Call Gemini with the user's actual data
     if (ai) {
       try {
-        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
         const r = await model.generateContent([{
           text: INSIGHTS_PROMPT + "\n\nThis user's actual financial data:\n" + JSON.stringify(txSummary),
         }]);

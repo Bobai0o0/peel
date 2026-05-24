@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     if (ai) {
       try {
-        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
         const r = await model.generateContent([
           { text: RECEIPT_PROMPT + "\nParse this receipt:" },
           { inlineData: { mimeType: m[1], data: m[2] } },
