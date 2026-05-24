@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     if (ai) {
       try {
-        const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
         const r = await model.generateContent([{
           text: DOER_PROMPT + "\nActions: cancel ClassPass $49/mo + Crave $9.99/mo, schedule TFSA $400/mo, switch rewards to groceries/gas/recurring +$127/yr",
         }]);
