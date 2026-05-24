@@ -37,7 +37,6 @@ function LearnCard({card}:{card:any}){
 export default function Home() {
   const [session,setSession]=useState<any>(null);
   const [loading,setLoading]=useState(true);
-  const [seeded,setSeeded]=useState(false);
   const [appOpen,setAppOpen]=useState(false);
   const [accounts,setAccounts]=useState<any[]>([]);
   const [msgs,setMsgs]=useState<any[]>([]);
@@ -57,14 +56,30 @@ export default function Home() {
     return ()=>subscription.unsubscribe();
   },[]);
 
-  useEffect(()=>{
-    if(!session||!seeded) return;
-    sb.from("accounts").select("*").eq("user_id",session.user.id).then(({data})=>{if(data)setAccounts(data)});
-    const ch=sb.channel("a").on("postgres_changes",{event:"UPDATE",schema:"public",table:"accounts"},p=>{
-      setAccounts(prev=>prev.map(a=>a.name===p.new.name?{...a,balance:p.new.balance}:a));
+  useEffect(() => {
+    if (!session) return;
+    const uid = session.user.id;
+    const name = session.user.email?.split("@")[0] || "User";
+
+    // Ensure user profile exists (creates on first login, no-ops after)
+    const init = async () => {
+      const { data: existing } = await sb.from("user_profiles").select("id").eq("id", uid).single();
+      if (!existing) {
+        await fetch("/api/seed-demo", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + session.access_token },
+        });
+      }
+      const { data: acc } = await sb.from("accounts").select("*").eq("user_id", uid);
+      if (acc) setAccounts(acc);
+    };
+    init();
+
+    const ch = sb.channel("a").on("postgres_changes", { event: "UPDATE", schema: "public", table: "accounts" }, p => {
+      setAccounts(prev => prev.map(a => a.name === p.new.name ? { ...a, balance: p.new.balance } : a));
     }).subscribe();
-    return ()=>{sb.removeChannel(ch)};
-  },[session,seeded]);
+    return () => { sb.removeChannel(ch) };
+  }, [session]);
 
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"})},[msgs,typing]);
 
@@ -76,11 +91,6 @@ export default function Home() {
     setTyping(true); await new Promise(r=>setTimeout(r,500+Math.random()*500)); setTyping(false);
     setMsgs(p=>[...p,{id:crypto.randomUUID(),from:"peel",text,...extra}]);
   },[]);
-
-  const seed=async()=>{
-    const res=await fetch("/api/seed-demo",{method:"POST",headers:{"Authorization":"Bearer "+session.access_token}});
-    if((await res.json()).ok) setSeeded(true);
-  };
 
   const scanReceipt=async(file:File)=>{
     if(!uid)return;
@@ -303,17 +313,6 @@ export default function Home() {
       </div>
     </footer>
     </>
-  );
-
-  // ─── SEED SCREEN ───────────────────────────────────────────
-  if(!seeded) return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white-smoke-1">
-      <div className="text-6xl mb-6">🍊</div>
-      <h1 className="text-2xl font-black text-dim-gray-300 mb-2">Welcome to Peel</h1>
-      <p className="text-dim-gray-500 font-medium mb-6">Load demo data to get started</p>
-      <button onClick={seed} className="bg-burnt-orange text-white font-black px-8 py-4 rounded-2xl border-b-4 border-black/30">Load demo data →</button>
-      <button onClick={()=>{sb.auth.signOut();setAppOpen(false)}} className="mt-4 text-dim-gray-500 text-sm font-bold">sign out</button>
-    </div>
   );
 
   // ─── APP (chat interface in peel style) ────────────────────
