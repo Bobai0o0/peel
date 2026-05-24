@@ -85,11 +85,13 @@ export async function POST(req: NextRequest) {
           // Save insights to DB
           for (const msg of parsed.messages) {
             if (msg.insight_data?.type) {
-              await db.from("insights").insert({
-                user_id: userId, insight_type: msg.insight_data.type,
-                headline: (msg.text || "").slice(0, 100), detail: msg.text,
-                annual_value: msg.insight_data.annual_value, status: "pending",
-              }).catch(() => {});
+              try {
+                await db.from("insights").insert({
+                  user_id: userId, insight_type: msg.insight_data.type,
+                  headline: (msg.text || "").slice(0, 100), detail: msg.text,
+                  annual_value: msg.insight_data.annual_value, status: "pending",
+                });
+              } catch {}
             }
           }
 
